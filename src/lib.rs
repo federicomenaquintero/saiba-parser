@@ -105,6 +105,61 @@ impl TemperatureResponse {
     }
 }
 
+/// Reason for which the device restarted, data sheet pp. 58
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum RestartReason {
+    PoweredOff,
+    SoftwareReset,
+    BrownOut,
+    Watchdog,
+    Unknown
+}
+
+/// Response from the "Status" command to get the device status
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub struct DeviceStatusResponse {
+    pub restart_reason: RestartReason,
+    pub vcc_voltage: f64
+}
+
+impl DeviceStatusResponse {
+    /// Parses the result of the "Status" command to get the device's status.
+    pub fn parse (response: &[u8]) -> Result<DeviceStatusResponse> {
+        let r = str_from_response (response)?;
+
+        if r.starts_with ("?Status,") {
+            let rest = r.get (8..).unwrap ();
+            let mut split = rest.split (',');
+
+            let restart_reason = match split.next () {
+                Some ("P") => RestartReason::PoweredOff,
+                Some ("S") => RestartReason::SoftwareReset,
+                Some ("B") => RestartReason::BrownOut,
+                Some ("W") => RestartReason::Watchdog,
+                Some ("U") => RestartReason::Unknown,
+                _          => return Err (ErrorKind::ResponseParse.into ())
+            };
+
+            let voltage = if let Some (voltage_str) = split.next () {
+                f64::from_str (voltage_str).chain_err (|| ErrorKind::ResponseParse)?
+            } else {
+                return Err (ErrorKind::ResponseParse.into ());
+            };
+
+            if let Some (_) = split.next() {
+                return Err (ErrorKind::ResponseParse.into ());
+            }
+
+            Ok (DeviceStatusResponse {
+                restart_reason: restart_reason,
+                vcc_voltage: voltage
+            })
+        } else {
+            Err (ErrorKind::ResponseParse.into ())
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -184,5 +239,55 @@ mod tests {
 
         let response = "-x\0".as_bytes ();
         assert! (TemperatureResponse::parse (response, TemperatureScale::Celsius).is_err ());
+    }
+
+    #[test]
+    fn parses_device_status_response () {
+        let response = "?Status,P,1.5\0".as_bytes ();
+        assert_eq! (DeviceStatusResponse::parse (response).unwrap (),
+                    DeviceStatusResponse {
+                        restart_reason: RestartReason::PoweredOff,
+                        vcc_voltage: 1.5
+                    });
+
+        let response = "?Status,S,1.5\0".as_bytes ();
+        assert_eq! (DeviceStatusResponse::parse (response).unwrap (),
+                    DeviceStatusResponse {
+                        restart_reason: RestartReason::SoftwareReset,
+                        vcc_voltage: 1.5
+                    });
+
+        let response = "?Status,B,1.5\0".as_bytes ();
+        assert_eq! (DeviceStatusResponse::parse (response).unwrap (),
+                    DeviceStatusResponse {
+                        restart_reason: RestartReason::BrownOut,
+                        vcc_voltage: 1.5
+                    });
+
+        let response = "?Status,W,1.5\0".as_bytes ();
+        assert_eq! (DeviceStatusResponse::parse (response).unwrap (),
+                    DeviceStatusResponse {
+                        restart_reason: RestartReason::Watchdog,
+                        vcc_voltage: 1.5
+                    });
+
+        let response = "?Status,U,1.5\0".as_bytes ();
+        assert_eq! (DeviceStatusResponse::parse (response).unwrap (),
+                    DeviceStatusResponse {
+                        restart_reason: RestartReason::Unknown,
+                        vcc_voltage: 1.5
+                    });
+    }
+
+    #[test]
+    fn parsing_invalid_device_status_response_yields_error () {
+        let response = "\0".as_bytes ();
+        assert! (DeviceStatusResponse::parse (response).is_err ());
+
+        let response = "?Status,X,\0".as_bytes ();
+        assert! (DeviceStatusResponse::parse (response).is_err ());
+
+        let response = "?Status,P,1.5,\0".as_bytes ();
+        assert! (DeviceStatusResponse::parse (response).is_err ());
     }
 }
