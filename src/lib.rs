@@ -22,7 +22,7 @@ pub enum TemperatureScale {
 
 /// Response from the "S,?" command to query temperature scale
 #[derive(Debug, Copy, Clone, PartialEq)]
-pub struct TemperatureScaleResponse (TemperatureScale);
+pub struct TemperatureScaleResponse (pub TemperatureScale);
 
 impl TemperatureScaleResponse {
     /// Parses the result of the "S,?" command to query temperature scale.
@@ -50,7 +50,7 @@ fn str_from_response (response: &[u8]) -> Result <&str> {
 
 /// Seconds between automatic logging of readings
 #[derive(Debug, Copy, Clone, PartialEq)]
-pub struct DataLoggerStorageIntervalSeconds(u32);
+pub struct DataLoggerStorageIntervalSeconds(pub u32);
 
 /// Response from the "D,?" command to query the data logger's storage interval
 #[derive(Debug, Copy, Clone, PartialEq)]
