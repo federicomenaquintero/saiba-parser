@@ -26,6 +26,7 @@ pub struct TemperatureScaleResponse (pub TemperatureScale);
 
 impl TemperatureScaleResponse {
     /// Parses the result of the "S,?" command to query temperature scale.
+    ///
     /// Assumes that the passed response is the device's response without
     /// the initial status byte.
     pub fn parse (response: &[u8]) -> Result<TemperatureScaleResponse> {
@@ -59,6 +60,9 @@ pub struct DataLoggerStorageIntervalResponse (DataLoggerStorageIntervalSeconds);
 impl DataLoggerStorageIntervalResponse {
     /// Parses the result of the "D,?" command to query the data logger's
     /// storage interval.  Returns the number of seconds between readings.
+    ///
+    /// Assumes that the passed response is the device's response without
+    /// the initial status byte.
     pub fn parse (response: &[u8]) -> Result <DataLoggerStorageIntervalResponse> {
         let r = str_from_response (response)?;
 
@@ -98,6 +102,9 @@ impl TemperatureResponse {
     /// Parses the result of the "D" command to get a temperature reading.
     /// Note that this depends on knowing the temperature scale
     /// which the device is configured to use.
+    ///
+    /// Assumes that the passed response is the device's response without
+    /// the initial status byte.
     pub fn parse (response: &[u8], scale: TemperatureScale) -> Result <TemperatureResponse> {
         let r = str_from_response (response)?;
         let val = f64::from_str (r).chain_err (|| ErrorKind::ResponseParse)?;
@@ -124,6 +131,9 @@ pub struct DeviceStatusResponse {
 
 impl DeviceStatusResponse {
     /// Parses the result of the "Status" command to get the device's status.
+    ///
+    /// Assumes that the passed response is the device's response without
+    /// the initial status byte.
     pub fn parse (response: &[u8]) -> Result<DeviceStatusResponse> {
         let r = str_from_response (response)?;
 
