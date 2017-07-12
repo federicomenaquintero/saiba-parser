@@ -72,6 +72,39 @@ impl DataLoggerStorageIntervalResponse {
     }
 }
 
+/// A temperature value from a temperature reading
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum Temperature {
+    Celsius    (f64),
+    Kelvin     (f64),
+    Fahrenheit (f64)
+}
+
+impl Temperature {
+    pub fn new (scale: TemperatureScale, value: f64) -> Temperature {
+        match scale {
+            TemperatureScale::Celsius    => Temperature::Celsius (value),
+            TemperatureScale::Kelvin     => Temperature::Kelvin (value),
+            TemperatureScale::Fahrenheit => Temperature::Fahrenheit (value)
+        }
+    }
+}
+
+/// Response from the "R" command to take a temperature reading
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub struct TemperatureResponse (pub Temperature);
+
+impl TemperatureResponse {
+    /// Parses the result of the "D" command to get a temperature reading.
+    /// Note that this depends on knowing the temperature scale
+    /// which the device is configured to use.
+    pub fn parse (response: &[u8], scale: TemperatureScale) -> Result <TemperatureResponse> {
+        let r = str_from_response (response)?;
+        let val = f64::from_str (r).chain_err (|| ErrorKind::ResponseParse)?;
+        Ok (TemperatureResponse (Temperature::new (scale, val)))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -127,5 +160,29 @@ mod tests {
 
         let response = "?D,foo\0".as_bytes ();
         assert! (DataLoggerStorageIntervalResponse::parse (response).is_err ());
+    }
+
+    #[test]
+    fn parses_temperature_response () {
+        let response = "0\0".as_bytes ();
+        assert_eq! (TemperatureResponse::parse (response, TemperatureScale::Celsius).unwrap (),
+                    TemperatureResponse (Temperature::Celsius (0.0)));
+
+        let response = "1234.5\0".as_bytes ();
+        assert_eq! (TemperatureResponse::parse (response, TemperatureScale::Kelvin).unwrap (),
+                    TemperatureResponse (Temperature::Kelvin (1234.5)));
+
+        let response = "-10.5\0".as_bytes ();
+        assert_eq! (TemperatureResponse::parse (response, TemperatureScale::Fahrenheit).unwrap (),
+                    TemperatureResponse (Temperature::Fahrenheit (-10.5)));
+    }
+
+    #[test]
+    fn parsing_invalid_temperature_response_yields_error () {
+        let response = "\0".as_bytes ();
+        assert! (TemperatureResponse::parse (response, TemperatureScale::Celsius).is_err ());
+
+        let response = "-x\0".as_bytes ();
+        assert! (TemperatureResponse::parse (response, TemperatureScale::Celsius).is_err ());
     }
 }
